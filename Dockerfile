@@ -1,5 +1,5 @@
 # --- Base image ---
-FROM python:3.9-slim
+FROM python:3.10-slim
 
 # --- Directorio de trabajo ---
 WORKDIR /app
@@ -10,6 +10,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # --- Copiar app ---
 COPY app.py .
+COPY conciliacion ./conciliacion
 
 # --- Exponer puerto de Streamlit ---
 EXPOSE 8501
