@@ -43,8 +43,9 @@ preview_tabs(df_ext_raw, df_sys_raw)
 
 # 4) Mapeo de columnas
 (
-    ext_col_fecha, ext_col_concepto, ext_col_importe,
-    sys_col_emision, sys_col_venc, modo_importe,
+    ext_col_fecha, ext_col_concepto, ext_modo_importe,
+    ext_col_importe, ext_col_debe, ext_col_haber,
+    sys_col_emision, sys_col_venc, sys_modo_importe,
     sys_col_importe, sys_col_debe, sys_col_haber
 ) = mapping_section(df_ext_raw, df_sys_raw)
 
@@ -69,7 +70,10 @@ df_ext, df_ext_excl = apply_extract_transformations(
     df_ext_raw=df_ext_raw,
     col_fecha=ext_col_fecha,
     col_concepto=ext_col_concepto,
+    modo_importe=ext_modo_importe,
     col_importe=ext_col_importe,
+    col_debito=ext_col_debe,
+    col_credito=ext_col_haber,
     excluir_exact=excluir_exact,
     normalizar_texto=NORMALIZAR_TEXTO,
     decimales=DECIMALES,
@@ -79,7 +83,7 @@ df_sys = apply_system_transformations(
     df_sys_raw=df_sys_raw,
     col_emision=sys_col_emision,
     col_venc=sys_col_venc,
-    modo_importe=modo_importe,
+    modo_importe=sys_modo_importe,
     col_importe=sys_col_importe,
     col_debe=sys_col_debe,
     col_haber=sys_col_haber,
@@ -100,9 +104,10 @@ correctos, solo_ext, solo_sys = build_views_for_output(
     pairs=pairs,
     df_ext=df_ext,
     df_sys=df_sys,
-    ext_cols=(ext_col_fecha, ext_col_concepto, ext_col_importe),
+    ext_cols=(ext_col_fecha, ext_col_concepto, ext_col_importe, ext_col_debe, ext_col_haber),
     sys_cols=(sys_col_emision, sys_col_venc, sys_col_importe, sys_col_debe, sys_col_haber),
-    modo_importe=modo_importe,
+    modo_importe_sys=sys_modo_importe,
+    modo_importe_ext=ext_modo_importe,
     used_ext=used_ext,
     used_sys=used_sys,
 )
@@ -116,7 +121,7 @@ solo_sistema_vencidos, solo_sistema_diferidos = split_system_unmatched_by_due(
     col_debe=sys_col_debe,
     col_haber=sys_col_haber,
     fecha_corte=fecha_corte,
-    modo_importe=modo_importe,
+    modo_importe=sys_modo_importe,
 )
 
 # 12) Resumen de DESCARTADOS (si hay)

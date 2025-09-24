@@ -85,22 +85,35 @@ def mapping_section(df_ext_raw: pd.DataFrame, df_sys_raw: pd.DataFrame):
 
     c1, c2 = st.columns(2)
     with c1:
-        ext_col_fecha = st.selectbox("Extracto: FECHA", options=list(df_ext_raw.columns))
-        ext_col_concepto = st.selectbox("Extracto: CONCEPTO", options=list(df_ext_raw.columns))
-        ext_col_importe = st.selectbox("Extracto: IMPORTE (con signo)", options=list(df_ext_raw.columns))
+        ext_cols = list(df_ext_raw.columns)
+        ext_col_fecha = st.selectbox("Extracto: FECHA", options=ext_cols)
+        ext_col_concepto = st.selectbox("Extracto: CONCEPTO", options=ext_cols)
+
+        idx_ext_debito = _find_col(ext_cols, ["DEBITO", "DEBE"])
+        idx_ext_credito = _find_col(ext_cols, ["CREDITO", "HABER"])
+
+        ext_modo_importe = st.radio("Extracto: como obtener IMPORTE?", ["Columna unica", "Debe/Haber"], horizontal=True, index=0)
+        if ext_modo_importe == "Columna unica":
+            ext_col_importe = st.selectbox("Extracto: IMPORTE (con signo)", options=ext_cols)
+            ext_col_debe = None
+            ext_col_haber = None
+        else:
+            ext_col_importe = None
+            ext_col_debe = st.selectbox("Extracto: DEBITO", options=ext_cols, index=idx_ext_debito)
+            ext_col_haber = st.selectbox("Extracto: CREDITO", options=ext_cols, index=idx_ext_credito)
 
     with c2:
         sys_cols = list(df_sys_raw.columns)
         idx_emision = _find_col(sys_cols, ["EMISION"])
-        idx_venc    = _find_col(sys_cols, ["VENCIMIENTO"])
-        idx_debe    = _find_col(sys_cols, ["DEBE"])
-        idx_haber   = _find_col(sys_cols, ["HABER"])
+        idx_venc = _find_col(sys_cols, ["VENCIMIENTO"])
+        idx_debe = _find_col(sys_cols, ["DEBE"])
+        idx_haber = _find_col(sys_cols, ["HABER"])
 
-        sys_col_emision = st.selectbox("Sistema: EMISIÓN", options=sys_cols, index=idx_emision)
-        sys_col_venc    = st.selectbox("Sistema: VENCIMIENTO", options=sys_cols, index=idx_venc)
+        sys_col_emision = st.selectbox("Sistema: EMISION", options=sys_cols, index=idx_emision)
+        sys_col_venc = st.selectbox("Sistema: VENCIMIENTO", options=sys_cols, index=idx_venc)
 
-        modo_importe = st.radio("Sistema: ¿cómo obtener IMPORTE?", ["Columna única", "Debe/Haber"], horizontal=True, index=1)
-        if modo_importe == "Columna única":
+        sys_modo_importe = st.radio("Sistema: como obtener IMPORTE?", ["Columna unica", "Debe/Haber"], horizontal=True, index=1)
+        if sys_modo_importe == "Columna unica":
             sys_col_importe = st.selectbox("Sistema: IMPORTE", options=sys_cols)
             sys_col_debe = None
             sys_col_haber = None
@@ -110,8 +123,9 @@ def mapping_section(df_ext_raw: pd.DataFrame, df_sys_raw: pd.DataFrame):
             sys_col_haber = st.selectbox("Sistema: HABER", options=sys_cols, index=idx_haber)
 
     return (
-        ext_col_fecha, ext_col_concepto, ext_col_importe,
-        sys_col_emision, sys_col_venc, modo_importe,
+        ext_col_fecha, ext_col_concepto, ext_modo_importe,
+        ext_col_importe, ext_col_debe, ext_col_haber,
+        sys_col_emision, sys_col_venc, sys_modo_importe,
         sys_col_importe, sys_col_debe, sys_col_haber
     )
 
@@ -142,17 +156,44 @@ def filters_section(df_ext_raw: pd.DataFrame, ext_col_concepto: str):
 
     with col1:
         opciones = _concept_list_for_checklist(df_ext_raw, ext_col_concepto)
-        excluir_exact = st.multiselect(
-            "Seleccioná conceptos a EXCLUIR (exactos, ya normalizados)",
-            options=opciones,
-            default=[]
+        selection_key = "filters_excluir_exact_selection"
+        if selection_key not in st.session_state:
+            st.session_state[selection_key] = []
+
+        opciones = sorted(set(opciones) | set(st.session_state[selection_key]))
+
+        search_key = "filters_excluir_exact_search"
+        search_raw = st.text_input(
+            "Buscar coincidencias (contiene)",
+            key=search_key,
+            placeholder="Ej.: IVA"
         )
-        st.caption("Sugerencias ordenadas por frecuencia. Podés buscar escribiendo en el cuadro.")
+        search_norm = normalize_text(search_raw) if search_raw else ""
+
+        matches = [opt for opt in opciones if search_norm and search_norm in opt]
+        col_btn_add, col_btn_remove = st.columns(2)
+        with col_btn_add:
+            if st.button("Seleccionar coincidencias", key="filters_select_matches", disabled=not matches):
+                st.session_state[selection_key] = sorted(set(st.session_state[selection_key]) | set(matches))
+        with col_btn_remove:
+            if st.button("Quitar coincidencias", key="filters_remove_matches", disabled=not matches):
+                st.session_state[selection_key] = [opt for opt in st.session_state[selection_key] if opt not in matches]
+
+        excluir_exact = st.multiselect(
+            "Selecciona conceptos a EXCLUIR (exactos, ya normalizados)",
+            options=opciones,
+            key=selection_key
+        )
+
+        if search_norm:
+            st.caption(f"{len(matches)} coincidencias para '{search_raw}'")
+        st.caption("Sugerencias ordenadas por frecuencia. Podes buscar escribiendo en el cuadro.")
 
     with col2:
         fecha_corte = st.date_input("Fecha de corte para vencimientos", value=date.today())
 
     return excluir_exact, fecha_corte
+
 
 
 # ----- Parámetros de matching -----
